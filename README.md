@@ -1,5 +1,7 @@
 # PDF-Schwärzer
 
+Unter Windows: `Start.bat` doppelklicken. Python 3.11 oder neuer muss installiert sein. Das Skript erstellt eine lokale virtuelle Umgebung, installiert die Abhängigkeiten und öffnet das Tool im Browser. Das Terminal geöffnet lassen; zum Beenden Strg+C drücken. Unter Windows wird der Python-Launcher `py` oder ersatzweise `python` verwendet.
+
 Start: `sh Start.command` im Projektordner ausführen (Python 3.11 oder neuer). Unter macOS lässt sich `Start.command` auch doppelklicken. Beim ersten Start werden die Python-Abhängigkeiten installiert.
 
 Ohne automatisches Browserfenster: `sh Start.command --no-browser --port 8765`. Die Anwendung bindet ausschließlich an die lokale Loopback-Adresse. Nur für eine Person und ein geöffnetes Dokument pro Prozess vorgesehen. In einer Cloud-Umgebung läuft die Verarbeitung auf der Cloud-Maschine; die Aussage „auf deinem Rechner“ gilt für den lokalen Start.

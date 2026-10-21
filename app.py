@@ -72,7 +72,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.headers.get('Host') != f'127.0.0.1:{self.server.server_port}': return self.reply(b'{}', status=403)
         if self.path != '/': return self.reply(b'{}', status=404)
-        html = Path(__file__).with_name('index.html').read_text().replace('__TOKEN__', TOKEN)
+        html = Path(__file__).with_name('index.html').read_text(encoding='utf-8').replace('__TOKEN__', TOKEN)
         self.reply(html.encode(), 'text/html; charset=utf-8')
     def do_POST(self):
         global DOCUMENT
