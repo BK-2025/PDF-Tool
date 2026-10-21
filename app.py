@@ -1,5 +1,7 @@
 import io, json, secrets, threading, webbrowser, math, argparse
 import unicodedata
+import os
+from contextlib import contextmanager
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 import pymupdf as fitz
@@ -8,6 +10,17 @@ from PIL import Image, ImageDraw
 TOKEN = secrets.token_urlsafe(32)
 DOCUMENT = None
 OCR_CACHE = {}
+
+@contextmanager
+def model_directory(directory):
+    # The server processes requests serially. Native Tesseract builds on Windows
+    # may not handle non-ASCII absolute paths; pass only an ASCII relative path.
+    previous = Path.cwd()
+    try:
+        os.chdir(directory)
+        yield 'tessdata'
+    finally:
+        os.chdir(previous)
 
 def word_key(text):
     return unicodedata.normalize('NFKC', text).casefold().strip('.,;:!?()[]{}\"„“”«»')
@@ -121,15 +134,16 @@ class Handler(BaseHTTPRequestHandler):
                 if effective_dpi < 72:
                     raise ValueError('Seite zu groß für OCR. Bitte Seitengröße verkleinern.')
                 if index not in OCR_CACHE or OCR_CACHE[index][2] != dpi:
-                    tessdata = Path(__file__).with_name('tessdata')
+                    tessdata = Path(__file__).resolve().with_name('tessdata')
                     if not all((tessdata / (lang + '.traineddata')).is_file() for lang in ('deu','eng')):
                         raise ValueError('OCR-Sprachmodelle fehlen im Ordner tessdata.')
                     ocr_page = DOCUMENT[index]
                     rotation = ocr_page.rotation
                     try:
                         ocr_page.set_rotation(0)
-                        textpage = ocr_page.get_textpage_ocr(
-                            language='deu+eng', dpi=effective_dpi, full=True, tessdata=str(tessdata))
+                        with model_directory(tessdata.parent) as model_path:
+                            textpage = ocr_page.get_textpage_ocr(
+                                language='deu+eng', dpi=effective_dpi, full=True, tessdata=model_path)
                         OCR_CACHE[index] = (ocr_page, textpage, dpi)
                     finally:
                         ocr_page.set_rotation(rotation)

@@ -4,6 +4,9 @@ import threading
 import unittest
 import urllib.error
 import urllib.request
+import tempfile
+import shutil
+from pathlib import Path
 from http.server import HTTPServer
 import pymupdf as fitz
 from PIL import Image
@@ -138,6 +141,22 @@ class ToolTests(unittest.TestCase):
         for dpi in (0, 600, '200', True):
             with self.subTest(invalid=dpi), self.assertRaises(urllib.error.HTTPError):
                 self.post('/ocr', {'page': 0, 'dpi': dpi})
+
+    def test_relative_models_in_unicode_directory(self):
+        original = Path.cwd()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / 'Vermögens verwaltung'
+            shutil.copytree(Path(app.__file__).parent / 'tessdata', root / 'tessdata')
+            with fitz.open(stream=self.fixture(scan=True), filetype='pdf') as doc:
+                with app.model_directory(root) as models:
+                    self.assertEqual(models, 'tessdata')
+                    text = doc[0].get_textpage_ocr(language='deu+eng', dpi=150, full=True, tessdata=models)
+                    self.assertIn('SECRET', text.extractText())
+            self.assertEqual(Path.cwd(), original)
+            with self.assertRaisesRegex(RuntimeError, 'test failure'):
+                with app.model_directory(root):
+                    raise RuntimeError('test failure')
+            self.assertEqual(Path.cwd(), original)
 
 
 if __name__ == '__main__':
