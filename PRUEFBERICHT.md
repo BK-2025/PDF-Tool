@@ -12,7 +12,7 @@ Grundlage: bereitgestellte Datei PDF-Schwaerzer(1).zip. Quellcode und deutsche/e
 
 ## Verifiziert
 
-Python 3.12, PyMuPDF 1.26.7, Pillow 13.0.0. Sechs erfolgreiche Integrationstests mit mehreren Unterfällen: HTTP-Token, Vorschau, Textsuche und Rasterexport bei 0/90/180/270 Grad, OCR bei 0/90 Grad, Dokument schließen und OCR-Cache leeren, ungültige Anfragen. Der Export enthält keine extrahierbare Textschicht, keinen Test-Anhang und keine ursprüngliche Autorenangabe. Eine Pixelprobe im markierten Bereich ist schwarz. pip check meldet keine defekten Abhängigkeiten.
+Python 3.12, PyMuPDF 1.26.7, Pillow 13.0.0. Zehn erfolgreiche Integrationstests mit mehreren Unterfällen: HTTP-Token, Vorschau, Textsuche und Rasterexport bei 0/90/180/270 Grad, OCR bei 0/90 Grad, Dokument schließen und OCR-Cache leeren, ungültige Anfragen. Der Bild-PDF-Export enthält keine extrahierbare Textschicht, keinen Test-Anhang und keine ursprüngliche Autorenangabe. Eine Pixelprobe im markierten Bereich ist schwarz. pip check meldet keine defekten Abhängigkeiten.
 
 ## Grenzen
 
@@ -29,3 +29,9 @@ Weitere sinnvolle Verbesserungen: OCR-Abbruch und Wiederaufnahme sowie Prüfrege
 ## Zoom, Trefferliste und mehrere Suchbegriffe
 
 Umgesetzt und mit Chromium/Playwright geprüft: mehrzeilige Suche mit gemeinsamer Trefferliste, Deduplizierung identischer Treffer, Seitensprung zur Fundstelle, Zoom mit erhöhter Rasterauflösung, Zurücksetzen auf Standardbreite, Übernahme aller Treffer und Rückgängig. Der Browser prüft außerdem Wortklick, Exportblockade bei offenen Vorschautreffern, PDF-Download, Dokument schließen und Drag-and-drop. Keine JavaScript-Laufzeitfehler im Test. Ein weiterer Python-Test prüft Zoomauflösung und Ablehnung ungültiger Zoomwerte. Ausstehende Suchen blockieren den Export, damit noch nicht angezeigte Treffer nicht versehentlich übergangen werden.
+
+## Durchsuchbarer OCR-Export
+
+Standardausgabe der Oberfläche ist jetzt eine geschwärzte PDF mit neu erzeugter OCR-Textschicht. Der Endpunkt akzeptiert `searchable: true`; ohne Angabe bleibt für bestehende API-Nutzer der Bildexport erhalten. Ausgangspunkt der Erkennung sind ausschließlich bereits geschwärzte Rasterbilder. Originaltextschichten, ursprüngliche OCR-Caches und Anhänge werden nicht übernommen. Fehler der OCR verhindern die Ausgabe und nennen die Seite.
+
+Zusätzlicher Integrationstest mit Text-PDFs und Scans bei 0/90/180/270 Grad: Der ursprüngliche OCR-Cache enthält den geheimen Testbegriff, die exportierte Textschicht enthält ihn nach Schwärzung nicht. Sichtbare Wörter auf einer separaten Textzeile bleiben durchsuchbar, Pixelproben in den Schwärzungen sind schwarz. Anhänge und Autorenmetadaten fehlen weiterhin. Ein zweiter Test prüft den expliziten Fehlerfall. Der Chromium-Test lädt beide Exportvarianten herunter und prüft deren extrahierbaren Text. Zehn Integrationstests und Browsertest erfolgreich. Die OCR-Genauigkeit bei benachbarten Schwärzungen, kleinen Schriften und realen Scans bleibt qualitätsabhängig; der Test ist keine Vollständigkeitsgarantie.

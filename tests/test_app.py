@@ -2,6 +2,7 @@ import io
 import json
 import threading
 import unittest
+from unittest.mock import patch
 import urllib.error
 import urllib.request
 import tempfile
@@ -39,7 +40,8 @@ class ToolTests(unittest.TestCase):
     def fixture(self, scan=False, rotation=0):
         with fitz.open() as doc:
             page = doc.new_page(width=400, height=240)
-            page.insert_text((40, 80), 'SECRET Alice Example', fontsize=20)
+            page.insert_text((40, 80), 'SECRET', fontsize=20)
+            page.insert_text((40, 140), 'Alice Example', fontsize=20)
             if scan:
                 png = page.get_pixmap(dpi=300).tobytes('png')
                 with fitz.open() as scanned:
@@ -153,10 +155,42 @@ class ToolTests(unittest.TestCase):
                     text = doc[0].get_textpage_ocr(language='deu+eng', dpi=150, full=True, tessdata=models)
                     self.assertIn('SECRET', text.extractText())
             self.assertEqual(Path.cwd(), original)
+
             with self.assertRaisesRegex(RuntimeError, 'test failure'):
                 with app.model_directory(root):
                     raise RuntimeError('test failure')
             self.assertEqual(Path.cwd(), original)
+
+    def test_searchable_redacted_export(self):
+        for scan in (False, True):
+            for rotation in (0, 90, 180, 270):
+                with self.subTest(scan=scan, rotation=rotation):
+                    self.post('/load', self.fixture(scan=scan, rotation=rotation), True)
+                    # Populate the original OCR cache with the secret. Export
+                    # must never use it for its new text layer.
+                    self.post('/ocr', {'page': 0})
+                    marks = json.loads(self.post('/search', {'term': 'SECRET'}))
+                    self.assertTrue(marks['0'])
+                    data = self.post('/export', {'marks': marks, 'searchable': True})
+                    with fitz.open(stream=data, filetype='pdf') as result:
+                        text = result[0].get_text().casefold()
+                        self.assertNotIn('secret', text)
+                        self.assertIn('alice', text)
+                        self.assertIn('example', text)
+                        self.assertEqual(result.embfile_count(), 0)
+                        self.assertFalse(result.metadata.get('author'))
+                        pix = result[0].get_pixmap(dpi=200)
+                        image = Image.open(io.BytesIO(pix.tobytes('png')))
+                        for x0, y0, x1, y1 in marks['0']:
+                            self.assertEqual(image.getpixel((int((x0+x1)/2*image.width), int((y0+y1)/2*image.height)))[:3], (0, 0, 0))
+
+    def test_searchable_export_failure_is_reported(self):
+        self.post('/load', self.fixture(), True)
+        with patch.object(fitz.Pixmap, 'pdfocr_tobytes', side_effect=RuntimeError('OCR unavailable')):
+            with self.assertRaises(urllib.error.HTTPError) as error:
+                self.post('/export', {'marks': {}, 'searchable': True})
+            self.assertIn('OCR-Export auf Seite 1', json.loads(error.exception.read())['error'])
+        self.assertIsNotNone(app.DOCUMENT)
 
 
 if __name__ == '__main__':

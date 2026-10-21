@@ -41,7 +41,12 @@ def page_words(index):
         result.append({'text': word[4], 'rect': [max(0, rect.x0/page.rect.width), max(0, rect.y0/page.rect.height), min(1, rect.x1/page.rect.width), min(1, rect.y1/page.rect.height)]})
     return result
 
-def export_pdf(doc, marks):
+def export_pdf(doc, marks, searchable=False):
+    if type(searchable) is not bool:
+        raise ValueError("Ungültiger Exportmodus")
+    tessdata = Path(__file__).resolve().with_name("tessdata")
+    if searchable and not all((tessdata / (lang + ".traineddata")).is_file() for lang in ("deu", "eng")):
+        raise ValueError("OCR-Sprachmodelle fehlen im Ordner tessdata.")
     if not isinstance(marks, dict):
         raise ValueError('Ungültige Markierungen')
     for key, rectangles in marks.items():
@@ -52,24 +57,34 @@ def export_pdf(doc, marks):
                 raise ValueError('Ungültige Markierung')
             if r[2] <= r[0] or r[3] <= r[1]:
                 raise ValueError('Leere Markierung')
-    out = fitz.open()
-    for n, page in enumerate(doc):
-        pix = page.get_pixmap(dpi=200, colorspace=fitz.csRGB, alpha=False)
-        img = Image.frombytes('RGB', (pix.width, pix.height), pix.samples)
-        draw = ImageDraw.Draw(img)
-        for r in marks.get(str(n), []):
-            if len(r) != 4 or not all(isinstance(v, (int,float)) and math.isfinite(v) and 0 <= v <= 1 for v in r):
-                raise ValueError('Ungültige Markierung')
-            x0,y0,x1,y1 = r
-            if x1 <= x0 or y1 <= y0: raise ValueError('Leere Markierung')
-            draw.rectangle((math.floor(x0*pix.width), math.floor(y0*pix.height), min(pix.width-1, math.ceil(x1*pix.width)), min(pix.height-1, math.ceil(y1*pix.height))), fill='black')
-        buf = io.BytesIO()
-        img.save(buf, format='PNG')
-        p = out.new_page(width=page.rect.width, height=page.rect.height)
-        p.insert_image(p.rect, stream=buf.getvalue())
-    data = out.tobytes(garbage=4, deflate=True)
-    out.close()
-    return data
+    with fitz.open() as out:
+        for n, page in enumerate(doc):
+            pix = page.get_pixmap(dpi=200, colorspace=fitz.csRGB, alpha=False)
+            img = Image.frombytes('RGB', (pix.width, pix.height), pix.samples)
+            draw = ImageDraw.Draw(img)
+            for x0, y0, x1, y1 in marks.get(str(n), []):
+                draw.rectangle((math.floor(x0*pix.width), math.floor(y0*pix.height), min(pix.width-1, math.ceil(x1*pix.width)), min(pix.height-1, math.ceil(y1*pix.height))), fill='black')
+            buf = io.BytesIO()
+            # OCR needs upright glyphs. Blackening already used display-space
+            # coordinates; undo only the page rotation for recognition.
+            export_image = img.rotate(page.rotation, expand=True) if searchable else img
+            export_image.save(buf, format='PNG')
+            p = out.new_page(width=page.rect.width, height=page.rect.height)
+            if searchable:
+                # Only the already blackened pixels reach OCR. Never reuse the
+                # source text layer or OCR_CACHE in a searchable export.
+                sanitized = fitz.Pixmap(buf.getvalue())
+                sanitized.set_dpi(200, 200)
+                try:
+                    with model_directory(tessdata.parent) as model_path:
+                        recognized = sanitized.pdfocr_tobytes(language='deu+eng', tessdata=model_path)
+                    with fitz.open(stream=recognized, filetype='pdf') as ocr_doc:
+                        p.show_pdf_page(p.rect, ocr_doc, 0, rotate=-page.rotation)
+                except Exception as e:
+                    raise ValueError(f'OCR-Export auf Seite {n+1} fehlgeschlagen: {e}') from e
+            else:
+                p.insert_image(p.rect, stream=buf.getvalue())
+        return out.tobytes(garbage=4, deflate=True)
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args): pass
@@ -172,7 +187,7 @@ class Handler(BaseHTTPRequestHandler):
                     if rects: hits[str(n)]=rects
                 return self.reply(json.dumps(hits).encode())
             if self.path == '/export':
-                return self.reply(export_pdf(DOCUMENT, req['marks']), 'application/pdf')
+                return self.reply(export_pdf(DOCUMENT, req['marks'], req.get('searchable', False)), 'application/pdf')
             if self.path == '/clear':
                 DOCUMENT.close(); DOCUMENT=None
                 OCR_CACHE.clear()
