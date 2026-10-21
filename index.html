@@ -31,7 +31,7 @@ for(let p of pages){
  const began=Date.now(),message=()=>`OCR: Seite ${p+1} von ${count} · ${Math.floor((Date.now()-began)/1000)} s · ${dpi} dpi. Erkennung läuft; noch kein Ergebnis.`,update=()=>{status(message());$('ocrState').textContent=message()};
  update();let timer=setInterval(update,1000);
  try{let j=await(await api('/ocr',{page:p,dpi})).json();characters+=j.characters}
- catch(e){$('ocrState').textContent=`OCR auf Seite ${p+1} fehlgeschlagen. Bereits erkannte Seiten bleiben erhalten.`;throw Error(`Seite ${p+1}: ${e.message}`)}
+ catch(e){$('ocrState').textContent=`OCR auf Seite ${p+1} fehlgeschlagen: ${e.message}. Bereits erkannte Seiten bleiben erhalten.`;throw Error(`Seite ${p+1}: ${e.message}`)}
  finally{clearInterval(timer)}
 }
 $('ocrState').textContent=`OCR fertig · ${pages.length} Seiten · ${characters} Zeichen erkannt`;
