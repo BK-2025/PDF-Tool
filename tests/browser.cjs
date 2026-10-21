@@ -20,6 +20,9 @@ const {execFileSync} = require('node:child_process');
   await page.selectOption('#ocrScope','current');
   await page.click('#ocr');
   await page.waitForFunction(()=>document.querySelector('#ocrState').textContent.includes('OCR fertig · 1 Seiten')&&!document.querySelector('#term').disabled);
+  // Reload to test native-text result counts independently of OCR rectangles.
+  await page.setInputFiles('#file',fixture);
+  await page.waitForFunction(()=>document.querySelector('#ocrState').textContent.includes('Für Scans zuerst')&&!document.querySelector('#search').disabled);
   await page.fill('#term','Alice\nSECRET\nAlice');
   await page.waitForFunction(()=>document.querySelectorAll('#results button').length===4);
   assert.match(await page.locator('#resultsInfo').textContent(),/4 Fundstellen auf 2 Seiten/);
