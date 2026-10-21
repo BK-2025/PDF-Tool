@@ -20,7 +20,7 @@ Auf einem anderen Rechner: Python 3.11 oder neuer installieren und `python3 -m v
 
 ## Lokale OCR für gescannte PDFs
 
-Nach dem Öffnen auf „Scan-Texterkennung (OCR)“ klicken. Das Werkzeug erkennt jede Seite mit 300 dpi auf Deutsch und Englisch und zeigt den Fortschritt pro Seite an. Danach findet die normale Suche auch Text in gescannten Seiten und markiert dessen Positionen. Vorhandene Markierungen bleiben bei OCR erhalten. Erkennungsergebnisse werden nur im Arbeitsspeicher für das aktuelle Dokument gehalten und beim Schließen oder Öffnen einer anderen PDF gelöscht. Im Export bleibt weiterhin keine Textschicht enthalten.
+Nach dem Öffnen auf „Scan-Texterkennung (OCR)“ klicken. Das Werkzeug erkennt die gewählten Seiten mit einstellbaren 150, 200 oder 300 dpi auf Deutsch und Englisch und zeigt den Fortschritt pro Seite an. Danach findet die normale Suche auch Text in gescannten Seiten und markiert dessen Positionen. Vorhandene Markierungen bleiben bei OCR erhalten. Erkennungsergebnisse werden nur im Arbeitsspeicher für das aktuelle Dokument gehalten und beim Schließen oder Öffnen einer anderen PDF gelöscht. Im Export bleibt weiterhin keine Textschicht enthalten.
 
 OCR ist keine verlässliche Vollständigkeitsprüfung. Besonders Handschrift, schiefe Scans, schlechte Bildqualität und ähnliche Zeichen (0/O, 1/I) können zu fehlenden oder falschen Treffern führen. Prüfe jede Seite visuell. Die Erkennung kann pro Seite einige Sekunden dauern.
 
@@ -51,3 +51,7 @@ Mit − und + lässt sich zwischen 50 und 300 Prozent zoomen. „Breite anpassen
 ### Browsertest
 
 Optional mit installiertem Node.js, Playwright und Chromium: Anwendung separat mit `.venv/bin/python app.py --no-browser --port 8766` starten, dann `node tests/browser.cjs http://127.0.0.1:8766` ausführen. Der Test erzeugt seine eigene PDF und ersetzt das Dokument im Testserver; deshalb einen separaten Prozess verwenden. Chromium wird standardmäßig unter `/usr/bin/chromium` gesucht; mit `CHROMIUM_PATH` lässt sich der Pfad anpassen. Eine eigene passende Test-PDF kann als zweites Argument übergeben werden.
+
+## OCR dauert lange oder bleibt auf einer Seite
+
+Standard ist jetzt 200 dpi; für einen schnellen Test „Schnell · 150 dpi“ und „Nur aktuelle Seite“ wählen. 300 dpi kann kleine Schrift besser erkennen, benötigt aber mehr Rechenzeit und Speicher. Sehr große Seiten werden für OCR auf etwa 12 Millionen Rasterpixel begrenzt; das ist keine feste Grenze für den gesamten Prozessspeicher. Die Anzeige zählt die verstrichenen Sekunden pro Seite, auch solange noch kein Ergebnis vorliegt. Sie misst keinen Erkennungsfortschritt. Fehler nennen die betroffene Seite. Bereits erkannte Seiten bleiben bei einem Fehler erhalten. Die native OCR einer einzelnen Seite lässt sich weiterhin nicht über die Oberfläche abbrechen; bei Bedarf den Server im Terminal mit Strg+C beenden. Dadurch gehen das geöffnete Dokument und ungespeicherte Markierungen verloren.

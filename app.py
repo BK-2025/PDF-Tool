@@ -112,7 +112,15 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(p.get_pixmap(matrix=fitz.Matrix(scale,scale), alpha=False).tobytes('png'), 'image/png')
             if self.path == '/ocr':
                 index = int(req['page'])
-                if index not in OCR_CACHE:
+                dpi = req.get('dpi', 200)
+                if type(dpi) is not int or dpi not in (150, 200, 300):
+                    raise ValueError('OCR-Auflösung muss 150, 200 oder 300 dpi sein')
+                rect = DOCUMENT[index].rect
+                pixel_area = rect.width * rect.height * (dpi / 72) ** 2
+                effective_dpi = min(dpi, int(dpi * math.sqrt(12_000_000 / max(1, pixel_area))))
+                if effective_dpi < 72:
+                    raise ValueError('Seite zu groß für OCR. Bitte Seitengröße verkleinern.')
+                if index not in OCR_CACHE or OCR_CACHE[index][2] != dpi:
                     tessdata = Path(__file__).with_name('tessdata')
                     if not all((tessdata / (lang + '.traineddata')).is_file() for lang in ('deu','eng')):
                         raise ValueError('OCR-Sprachmodelle fehlen im Ordner tessdata.')
@@ -121,12 +129,12 @@ class Handler(BaseHTTPRequestHandler):
                     try:
                         ocr_page.set_rotation(0)
                         textpage = ocr_page.get_textpage_ocr(
-                            language='deu+eng', dpi=300, full=True, tessdata=str(tessdata))
-                        OCR_CACHE[index] = (ocr_page, textpage)
+                            language='deu+eng', dpi=effective_dpi, full=True, tessdata=str(tessdata))
+                        OCR_CACHE[index] = (ocr_page, textpage, dpi)
                     finally:
                         ocr_page.set_rotation(rotation)
                 text = OCR_CACHE[index][1].extractText()
-                return self.reply(json.dumps({'characters':len(text)}).encode())
+                return self.reply(json.dumps({'characters':len(text), 'dpi':effective_dpi}).encode())
             if self.path == '/search':
                 term = req['term'].strip()
                 if not term: raise ValueError('Suchtext fehlt')

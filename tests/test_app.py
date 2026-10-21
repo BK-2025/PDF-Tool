@@ -127,6 +127,18 @@ class ToolTests(unittest.TestCase):
             with self.subTest(zoom=invalid), self.assertRaises(urllib.error.HTTPError):
                 self.post('/page', {'page': 0, 'zoom': invalid})
 
+    def test_ocr_quality_selection(self):
+        self.post('/load', self.fixture(scan=True), True)
+        for dpi in (150, 200, 300):
+            with self.subTest(dpi=dpi):
+                result = json.loads(self.post('/ocr', {'page': 0, 'dpi': dpi}))
+                self.assertGreater(result['characters'], 0)
+                self.assertEqual(result['dpi'], dpi)
+                self.assertEqual(app.OCR_CACHE[0][2], dpi)
+        for dpi in (0, 600, '200', True):
+            with self.subTest(invalid=dpi), self.assertRaises(urllib.error.HTTPError):
+                self.post('/ocr', {'page': 0, 'dpi': dpi})
+
 
 if __name__ == '__main__':
     unittest.main()
