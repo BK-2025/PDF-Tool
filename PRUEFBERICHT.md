@@ -12,7 +12,7 @@ Grundlage: bereitgestellte Datei PDF-Schwaerzer(1).zip. Quellcode und deutsche/e
 
 ## Verifiziert
 
-Python 3.12, PyMuPDF 1.26.7, Pillow 13.0.0. Zehn erfolgreiche Integrationstests mit mehreren Unterfällen: HTTP-Token, Vorschau, Textsuche und Rasterexport bei 0/90/180/270 Grad, OCR bei 0/90 Grad, Dokument schließen und OCR-Cache leeren, ungültige Anfragen. Der Bild-PDF-Export enthält keine extrahierbare Textschicht, keinen Test-Anhang und keine ursprüngliche Autorenangabe. Eine Pixelprobe im markierten Bereich ist schwarz. pip check meldet keine defekten Abhängigkeiten.
+Python 3.12, PyMuPDF 1.26.7, Pillow 13.0.0. Vierzehn erfolgreiche Integrationstests mit mehreren Unterfällen: HTTP-Token, Vorschau, Textsuche und Rasterexport bei 0/90/180/270 Grad, OCR bei 0/90 Grad, Dokument schließen und OCR-Cache leeren, ungültige Anfragen. Der Bild-PDF-Export enthält keine extrahierbare Textschicht, keinen Test-Anhang und keine ursprüngliche Autorenangabe. Eine Pixelprobe im markierten Bereich ist schwarz. pip check meldet keine defekten Abhängigkeiten.
 
 ## Grenzen
 
@@ -35,3 +35,11 @@ Umgesetzt und mit Chromium/Playwright geprüft: mehrzeilige Suche mit gemeinsame
 Standardausgabe der Oberfläche ist jetzt eine geschwärzte PDF mit neu erzeugter OCR-Textschicht. Der Endpunkt akzeptiert `searchable: true`; ohne Angabe bleibt für bestehende API-Nutzer der Bildexport erhalten. Ausgangspunkt der Erkennung sind ausschließlich bereits geschwärzte Rasterbilder. Originaltextschichten, ursprüngliche OCR-Caches und Anhänge werden nicht übernommen. Fehler der OCR verhindern die Ausgabe und nennen die Seite.
 
 Zusätzlicher Integrationstest mit Text-PDFs und Scans bei 0/90/180/270 Grad: Der ursprüngliche OCR-Cache enthält den geheimen Testbegriff, die exportierte Textschicht enthält ihn nach Schwärzung nicht. Sichtbare Wörter auf einer separaten Textzeile bleiben durchsuchbar, Pixelproben in den Schwärzungen sind schwarz. Anhänge und Autorenmetadaten fehlen weiterhin. Ein zweiter Test prüft den expliziten Fehlerfall. Der Chromium-Test lädt beide Exportvarianten herunter und prüft deren extrahierbaren Text. Zehn Integrationstests und Browsertest erfolgreich. Die OCR-Genauigkeit bei benachbarten Schwärzungen, kleinen Schriften und realen Scans bleibt qualitätsabhängig; der Test ist keine Vollständigkeitsgarantie.
+
+## Verkleinerung und Textänderungen
+
+Drei Ausgabeprofile: Standard (200 dpi/PNG), Kompakt (150 dpi/JPEG 80) und Klein (100 dpi/Graustufen/JPEG 60). Bei OCR-Ausgaben erfolgt die Erkennung vor Verkleinerung mit mindestens 200 dpi. Die vom OCR-Modul erzeugten Bildobjekte werden durch transparente Platzhalter ersetzt; nur dessen neue Textschicht wird zusätzlich zum komprimierten Seitenbild übernommen. Tests prüfen JPEG-Bildobjekte auch im OCR-Export, tatsächliche Größenreduktion auf einer bildreichen Testseite und unveränderte physische Seitengröße. Einsparungen sind vorlagenabhängig.
+
+Das Textmodul ersetzt ausgewählte Bereiche durch weißen Hintergrund und schwarzen Ersatztext. Vorschau und Export verwenden dieselbe Satzfunktion. Die endgültige Ausgabe rastert die Änderungen; darunterliegende Originalobjekte werden nicht kopiert. Schwärzungen erfolgen nach Textänderungen. Suche und Wortauswahl beachten Ersatztexte und blenden ersetzte Originalstellen aus. Text wird als Klartext escaped; Markup kann nicht eingeschleust werden. Ungültige Bereiche, Seiten, Schriftgrößen, Überlappungen und nicht passende Texte werden abgewiesen.
+
+Vierzehn erfolgreiche Integrationstests: zusätzlich Kompression, neue/entfernte Wörter, Unicode und wörtliches Markup, leere Ersetzungen, Suchkonsistenz, gültige/ungültige Änderungen und Schwärzungen über Ersatztext in sämtlichen Profilen. Der Chromium-Test prüft Bereichsauswahl, fehlerhafte Schriftgröße ohne Übernahme, Vorschau, Suche nach Ersatztext, komprimierten OCR-Download und Rückgängig. Dieser Test läuft unter Linux; Windows-Bedienung und OCR-Qualität bei echten Dokumenten sind damit nicht abschließend geprüft. Kein vollständiger PDF-Layouteditor: feste Bereiche, weiße Hintergründe, Standardschrift, kein automatischer Umbruch auf Folgeseiten.

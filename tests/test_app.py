@@ -192,6 +192,79 @@ class ToolTests(unittest.TestCase):
             self.assertIn('OCR-Export auf Seite 1', json.loads(error.exception.read())['error'])
         self.assertIsNotNone(app.DOCUMENT)
 
+    def test_compression_profiles(self):
+        image = Image.effect_noise((1200, 800), 80).convert('RGB')
+        buf = io.BytesIO()
+        image.save(buf, format='PNG')
+        with fitz.open() as doc:
+            p = doc.new_page(width=432, height=288)
+            p.insert_image(p.rect, stream=buf.getvalue())
+            self.post('/load', doc.tobytes(), True)
+        sizes = []
+        for profile in ('standard', 'compact', 'small'):
+            data = self.post('/export', {'marks': {}, 'profile': profile})
+            sizes.append(len(data))
+            with fitz.open(stream=data, filetype='pdf') as result:
+                self.assertEqual(result[0].rect, fitz.Rect(0, 0, 432, 288))
+                if profile != 'standard':
+                    self.assertIn('DCTDecode', [entry[8] for entry in result[0].get_images()])
+        self.assertLess(sizes[1], sizes[0])
+        self.assertLess(sizes[2], sizes[1])
+
+    def test_text_replacement_and_searchable_profiles(self):
+        self.post('/load', self.fixture(), True)
+        self.post('/ocr', {'page': 0})
+        edits = {'0': [{'rect': [.08, .18, .8, .43], 'text': 'PUBLIC', 'font_size': 20}]}
+        words = json.loads(self.post('/words', {'page': 0, 'edits': edits}))
+        self.assertIn('PUBLIC', [w['text'] for w in words])
+        self.assertNotIn('SECRET', [w['text'] for w in words])
+        self.assertEqual(json.loads(self.post('/search', {'term': 'SECRET', 'edits': edits})), {})
+        self.assertIn('0', json.loads(self.post('/search', {'term': 'PUBLIC', 'edits': edits})))
+        self.assertTrue(self.post('/page', {'page': 0, 'edits': edits}).startswith(b'\x89PNG'))
+        for profile in ('standard', 'compact', 'small'):
+            with self.subTest(profile=profile):
+                data = self.post('/export', {'marks': {}, 'edits': edits, 'searchable': True, 'profile': profile})
+                with fitz.open(stream=data, filetype='pdf') as result:
+                    text = result[0].get_text().casefold()
+                    self.assertIn('public', text)
+                    self.assertNotIn('secret', text)
+                    if profile != 'standard':
+                        self.assertIn('DCTDecode', [entry[8] for entry in result[0].get_images()])
+                # Blackening has priority over replacement text.
+                data = self.post('/export', {'marks': {'0': [edits['0'][0]['rect']]}, 'edits': edits, 'searchable': True, 'profile': profile})
+                with fitz.open(stream=data, filetype='pdf') as result:
+                    self.assertNotIn('public', result[0].get_text().casefold())
+        # Client edits never modify the source document or its OCR cache.
+        self.assertIn('0', json.loads(self.post('/search', {'term': 'SECRET'})))
+
+    def test_invalid_edits_and_profiles(self):
+        self.post('/load', self.fixture(), True)
+        for request in (
+            {'marks': {}, 'profile': 'unknown'},
+            {'marks': {}, 'edits': []},
+            {'marks': {}, 'edits': {'9': []}},
+            {'marks': {}, 'edits': {'0': [{'rect': [0, 0, 1, 1], 'text': 'x', 'font_size': 0}]}},
+            {'marks': {}, 'edits': {'0': [{'rect': [0, 0, .01, .01], 'text': 'This does not fit', 'font_size': 72}]}},
+            {'marks': {}, 'edits': {'0': [{'rect': [0, 0, .5, .5], 'text': 'a'}, {'rect': [.1, .1, .6, .6], 'text': 'b'}]}},
+        ):
+            with self.subTest(request=request), self.assertRaises(urllib.error.HTTPError):
+                self.post('/export', request)
+
+    def test_replacement_unicode_and_removal(self):
+        self.post('/load', self.fixture(), True)
+        entry = {'rect': [.08, .18, .8, .43], 'text': 'Müller & <Söhne>', 'font_size': 18}
+        edits = {'0': [entry]}
+        words = json.loads(self.post('/words', {'page': 0, 'edits': edits}))
+        text = ' '.join(w['text'] for w in words)
+        self.assertIn('Müller', text)
+        self.assertIn('<Söhne>', text)
+        entry['text'] = ''
+        data = self.post('/export', {'marks': {}, 'edits': edits})
+        with fitz.open(stream=data, filetype='pdf') as result:
+            image = Image.open(io.BytesIO(result[0].get_pixmap(dpi=200).tobytes('png')))
+            self.assertEqual(image.getpixel((int(.3*image.width), int(.3*image.height)))[:3], (255, 255, 255))
+        self.assertEqual(json.loads(self.post('/search', {'term': 'SECRET', 'edits': edits})), {})
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -9,12 +9,12 @@ Ohne automatisches Browserfenster: `sh Start.command --no-browser --port 8765`. 
 1. PDF öffnen (bis 150 MB, ohne Passwort).
 2. Rechtecke aufziehen, Seiten mit den Pfeilen wechseln. Markierungen anklicken oder den letzten Schritt zurücknehmen.
 3. Bei Scans zuerst „Scan-Texterkennung (OCR)“ ausführen. Dann Text suchen: alle gefundenen Vorkommen werden markiert. Keine automatische Erkennung personenbezogener Daten; fehlende Treffer und abweichende Schreibweisen manuell prüfen.
-4. Geschwärzte PDF speichern. Die heruntergeladene Datei erneut öffnen und alle Seiten vor Weitergabe kontrollieren.
+4. PDF speichern. Die heruntergeladene Datei erneut öffnen und alle Seiten vor Weitergabe kontrollieren.
 5. Dokument schließen; zum Beenden im Terminal Strg+C drücken.
 
 Die Verarbeitung läuft ausschließlich auf 127.0.0.1 auf deinem Rechner. Keine externen Skripte, Schriften, Telemetrie oder Cloud-APIs. Dokumente und Vorschauen werden durch das Werkzeug nicht auf Platte gespeichert. Der Browser speichert den Export im Download-Ordner. Betriebssystem und Browser können Arbeitsspeicher auslagern; keine Garantie gegen lokale Forensik.
 
-Export: jede Seite wird mit 200 dpi gerendert, markierte Pixel schwarz überschrieben und als neues Bild in eine neue PDF geschrieben. Originalobjekte, Textschichten, Anhänge, Lesezeichen, Links, Formularfelder und Original-Metadaten werden nicht kopiert. Das Original bleibt unverändert. Standardmäßig erkennt OCR danach ausschließlich die geschwärzten Bilder erneut und ergänzt eine durchsuchbare, kopierbare Textschicht. Alternativ ist eine Bild-PDF ohne Textschicht auswählbar. Beide Varianten können größer werden und verlieren digitale Signaturen sowie die ursprüngliche Barrierefreiheitsstruktur. Sichtbare Angaben außerhalb der Markierungen bleiben erhalten.
+Export: jede Seite wird je nach Profil mit 100, 150 oder 200 dpi gerendert (für die OCR-Erkennung mindestens 200 dpi), markierte Pixel schwarz überschrieben und als neues Bild in eine neue PDF geschrieben. Originalobjekte, Textschichten, Anhänge, Lesezeichen, Links, Formularfelder und Original-Metadaten werden nicht kopiert. Das Original bleibt unverändert. Standardmäßig erkennt OCR danach ausschließlich die geschwärzten Bilder erneut und ergänzt eine durchsuchbare, kopierbare Textschicht. Alternativ ist eine Bild-PDF ohne Textschicht auswählbar. Beide Varianten können größer werden und verlieren digitale Signaturen sowie die ursprüngliche Barrierefreiheitsstruktur. Sichtbare Angaben außerhalb der Markierungen bleiben erhalten.
 
 Auf einem anderen Rechner: Python 3.11 oder neuer installieren und `python3 -m venv .venv`, `.venv/bin/python -m pip install -r requirements.txt`, `.venv/bin/python app.py` im Ordner ausführen. Nur die Installation benötigt Internet. PyMuPDF unterliegt AGPL bzw. kommerzieller Lizenz; bei Weiterverteilung oder Integration Lizenzbedingungen prüfen.
 
@@ -46,7 +46,7 @@ Im Suchfeld steht ein Suchbegriff oder eine Wortgruppe pro Zeile. Enter fügt ei
 
 Unter „Fundstellen“ springt jeder Eintrag zur entsprechenden Seite und hebt die Stelle mit einem orangefarbenen Rahmen hervor. Die Liste bleibt nach der Übernahme verfügbar. Gelb bedeutet Suchvorschau, Schwarz bedeutet übernommene Schwärzung.
 
-Mit − und + lässt sich zwischen 50 und 300 Prozent zoomen. „Breite anpassen“ setzt die Darstellung auf die verfügbare Standardbreite zurück. Die Vorschau wird für den Zoom neu gerendert (maximal 4000 Pixel pro Kante); der Export bleibt unabhängig davon bei 200 dpi.
+Mit − und + lässt sich zwischen 50 und 300 Prozent zoomen. „Breite anpassen“ setzt die Darstellung auf die verfügbare Standardbreite zurück. Die Vorschau wird für den Zoom neu gerendert (maximal 4000 Pixel pro Kante); der Export richtet sich unabhängig davon nach dem gewählten Größenprofil.
 
 ### Browsertest
 
@@ -62,6 +62,30 @@ Die Meldung bedeutet, dass die OCR-Sprachmodelle nicht initialisiert werden konn
 
 ## Geschwärzte PDF mit OCR speichern
 
-Unter „PDF-Ausgabe“ ist „Durchsuchbare PDF · OCR nach Schwärzung“ vorausgewählt. Nach dem Markieren auf „Geschwärzte PDF speichern“ klicken. Die Datei endet auf `-geschwaerzt-ocr.pdf`. Ihre sichtbaren Texte sind entsprechend der OCR-Erkennungsqualität suchbar und kopierbar. Ein vorheriger OCR-Lauf für die Suche ist für den Export nicht erforderlich.
+Unter „PDF-Ausgabe“ ist „Durchsuchbare PDF · OCR nach Schwärzung“ vorausgewählt. Nach dem Markieren auf „PDF speichern“ klicken. Die Datei endet auf `-geschwaerzt-ocr.pdf`. Ihre sichtbaren Texte sind entsprechend der OCR-Erkennungsqualität suchbar und kopierbar. Ein vorheriger OCR-Lauf für die Suche ist für den Export nicht erforderlich.
 
 Der Export rastert zuerst alle Seiten mit 200 dpi und überschreibt markierte Pixel schwarz. Nur diese geschwärzten Bilder werden danach mit Deutsch/Englisch erkannt; weder Originaltext noch OCR-Suchcache werden kopiert. Seitendrehungen werden für die Erkennung rückgängig gemacht und anschließend für die Ausgabe wiederhergestellt. Der OCR-Export benötigt mehr Zeit und funktionierende Sprachmodelle. Bei OCR-Fehlern wird keine vermeintlich durchsuchbare Datei ausgeliefert, sondern die betroffene Seite gemeldet. Der Modus „Bild-PDF · ohne Textschicht“ funktioniert weiterhin ohne OCR. Die neue OCR-Schicht kann Erkennungsfehler enthalten; die gespeicherte Datei vor Weitergabe prüfen.
+
+## PDF verkleinern
+
+Unter „Dateigröße / Qualität“ stehen drei Profile bereit:
+
+| Profil | Gespeichertes Seitenbild | Verwendung |
+| --- | --- | --- |
+| Standard | 200 dpi, Farbe, verlustfreie PNG-Kompression | Lesbarkeit und unveränderte Rasterqualität |
+| Kompakt | 150 dpi, Farbe, JPEG-Qualität 80 | Kleinere Dateien bei mäßigem Qualitätsverlust |
+| Klein | 100 dpi, Graustufen, JPEG-Qualität 60 | Stärkere Reduktion; feine Schrift und Farben können verloren gehen |
+
+Die Seitengröße auf Papier bleibt erhalten. Zum reinen Verkleinern können Schwärzungen und Textänderungen leer bleiben. „PDF speichern“ zeigt danach die erzeugte Dateigröße und die prozentuale Änderung zum Original. Eine bereits gut komprimierte oder rein vektorbasierte Originaldatei kann trotzdem kleiner als der Export sein; es gibt keine garantierte Zielgröße. Für durchsuchbare Ausgaben erkennt OCR zuerst das bereits bearbeitete und geschwärzte Bild mit 200 dpi. Danach wird das sichtbare Seitenbild entsprechend dem Profil reduziert; die neue Textschicht bleibt erhalten.
+
+## Text bearbeiten
+
+1. Im Werkzeug „Text bearbeiten · Wort / Bereich auswählen“ wählen.
+2. Ein Wort anklicken oder einen rechteckigen Bereich aufziehen. Bei Scans ist für einen Wortklick zuerst OCR nötig; die Bereichsauswahl funktioniert auch ohne OCR.
+3. Ersatztext und Schriftgröße zwischen 4 und 72 pt eingeben. Mehrere Zeilen sind möglich. Leerer Ersatztext entfernt den Inhalt.
+4. „Text übernehmen“ anklicken. Die Vorschau zeigt die tatsächliche Ersetzung. Reicht der Bereich nicht aus, eine kleinere Schrift oder einen größeren Bereich wählen.
+5. Änderungen sind in einer Liste mit Seitensprung und „Entfernen“ verfügbar. „Letzten Schritt zurück“ nimmt Textänderungen und Schwärzungen zurück.
+
+Der gewählte Bereich erhält einen weißen Hintergrund und schwarze Standardschrift; Originalschrift, Layoutfluss und Hintergrundfarben werden nicht automatisch rekonstruiert. Bereiche dürfen sich nicht überschneiden; eine vorherige Änderung gegebenenfalls zuerst entfernen. Textänderungen gelten für den gewählten Bereich, nicht automatisch für alle gleichen Wörter. Das ist eine Korrekturfunktion für einzelne Stellen, kein Textverarbeitungsprogramm mit automatischem Seitenumbruch.
+
+Die Originaldatei bleibt unverändert. Bei der Ausgabe wird die bearbeitete Seite gerastert; ursprüngliche Zeichen innerhalb ersetzter Bereiche werden nicht in die Ausgabe kopiert. Schwärzungen werden anschließend angewendet und haben Vorrang vor Ersatztext. Im OCR-Export wird ausschließlich der bereits bearbeitete und geschwärzte Stand neu erkannt. Nach dem Übernehmen durchsuchen Textsuche und Wortmodus die Ersatztexte; ersetzte Originalwörter werden ausgeblendet. Noch nicht übernommene Änderungen blockieren den Export. Dokument schließen, Server beenden oder eine andere PDF öffnen verwirft ungespeicherte Änderungen.
