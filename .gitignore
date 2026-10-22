@@ -2,3 +2,11 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
+
+.pdf-tool-settings.json
+.pdf-tool-settings.tmp
+build/
+dist/
+*.spec
+
+packaging/generated-licenses/

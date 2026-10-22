@@ -13,6 +13,7 @@ const {execFileSync} = require('node:child_process');
  try {
   const page=await browser.newPage({viewport:{width:1440,height:1000}});
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  async function approveChanged(){for(let n of await page.evaluate(()=>changedPages())){await page.evaluate(async n=>{page=n;await show()},n);await page.click('#approvePage')}}
   await page.goto(process.argv[2]||'http://127.0.0.1:8766');
   await page.setInputFiles('#file',fixture);
   await page.waitForFunction(()=>document.querySelector('#pageLabel').textContent.includes('Seite 1 / 2')&&!document.querySelector('#search').disabled);
@@ -50,6 +51,7 @@ const {execFileSync} = require('node:child_process');
   const canvas=await page.locator('#canvas').boundingBox();
   await page.mouse.click(canvas.x+(word.rect[0]+word.rect[2])/2*canvas.width,canvas.y+(word.rect[1]+word.rect[3])/2*canvas.height);
   await page.waitForFunction(()=>document.querySelector('#pageLabel').textContent.includes('2 Markierungen'));
+  await approveChanged();
   const downloadPromise=page.waitForEvent('download');await page.click('#export');const download=await downloadPromise;
   assert(download.suggestedFilename().endsWith('-geschwaerzt-ocr.pdf'));
   const exported=path.join(temp,'redacted-ocr.pdf');await download.saveAs(exported);
@@ -83,6 +85,7 @@ const {execFileSync} = require('node:child_process');
   await page.fill('#term','');
   await page.waitForFunction(()=>document.querySelectorAll('#results button').length===0);
   await page.selectOption('#sizeProfile','compact');await page.selectOption('#exportMode','ocr');
+  await approveChanged();
   const editedDownloadPromise=page.waitForEvent('download');await page.click('#export');const editedDownload=await editedDownloadPromise;
   const editedExport=path.join(temp,'edited.pdf');await editedDownload.saveAs(editedExport);
   execFileSync(path.join(__dirname,'../.venv/bin/python'),['-c',"import pymupdf as f,sys; d=f.open(sys.argv[1]); text=d[0].get_text().casefold(); assert 'public' in text; assert 'secret' not in text; assert any(i[8]=='DCTDecode' for i in d[0].get_images())",editedExport]);
