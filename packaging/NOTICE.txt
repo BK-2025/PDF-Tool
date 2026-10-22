@@ -1,0 +1,13 @@
+PDF-Tool
+Source: https://github.com/BK-2025/PDF-Tool
+
+The macOS application includes CPython, PyMuPDF/MuPDF, Pillow, PyInstaller,
+pyinstaller-hooks-contrib, altgraph, macholib and packaging. Their license
+texts are included in the app bundle's licenses directory. PyInstaller's
+bootloader exception applies to its generated application. PyMuPDF/MuPDF
+is offered under AGPL or a commercial license; redistribution must satisfy
+the applicable terms. This project does not grant a commercial license.
+
+German and English OCR models are supplied from tesseract-ocr/tessdata_fast:
+https://github.com/tesseract-ocr/tessdata_fast
+License: Apache-2.0, included under tessdata/LICENSE.txt.

@@ -1,0 +1,64 @@
+name: macOS DMG
+on:
+  workflow_dispatch:
+  push:
+    branches: [pdf-schwaerzer]
+    paths:
+      - 'app.py'
+      - 'workflows.py'
+      - 'workflows.js'
+      - 'index.html'
+      - 'requirements.txt'
+      - 'tessdata/**'
+      - 'tests/**'
+      - 'packaging/**'
+      - '.github/workflows/macos-dmg.yml'
+permissions:
+  contents: read
+concurrency:
+  group: macos-dmg-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x86_64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python3 -m pip install -r requirements.txt pyinstaller==6.17.0
+      - run: python3 -m unittest discover -s tests -v
+      - run: bash packaging/build-macos.sh
+      - run: python3 packaging/smoke-macos.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PDF-Tool-macOS-${{ matrix.arch }}
+          path: dist/PDF-Tool-macOS-${{ matrix.arch }}.dmg
+          if-no-files-found: error
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-files
+      - name: Publish macOS preview
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          tag="mac-${GITHUB_SHA:0:8}"
+          gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --target "$GITHUB_SHA" --prerelease --title "PDF-Tool für macOS · Vorschau" --notes-file packaging/release-notes.md
+          gh release upload "$tag" release-files/*/*.dmg --clobber
